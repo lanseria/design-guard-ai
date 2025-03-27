@@ -17,6 +17,7 @@ pip install .
 ### 单个文件转换
 ```bash
 dga convert document.pdf -o output.md
+# dga convert ./input/ej_1.pdf -o output/ej_1.md
 # dga convert ./input/test1.pdf -o output/test1.md
 ```
 

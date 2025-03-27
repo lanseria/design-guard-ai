@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Optional
 from google.genai import types
 import typer
+import traceback
 from markitdown import MarkItDown
 from .const import (
     GEMINI_API_KEY,  # 新增Google API密钥
@@ -28,8 +29,9 @@ def generate_with_ai(prompt: str):
     )
     try:
         # Google AI生成流式响应
+        print('gemini-2.0-flash')
         for chunk in client.models.generate_content_stream(
-            model=LLM_MODEL,
+            model='gemini-2.0-flash',
             contents=[{
                 "role": "user",
                 "parts": [{"text": prompt}]
@@ -41,6 +43,7 @@ def generate_with_ai(prompt: str):
                 yield chunk.text
     except Exception as e:
         print(f"AI Generation Error: {e}") #可选： 打印错误信息到控制台
+        traceback.print_exc()
         raise  # 重新抛出异常，让上层函数处理
 
     return "".join(response)
