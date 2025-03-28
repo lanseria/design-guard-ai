@@ -12,6 +12,8 @@ AI_VENDOR = os.getenv("AI_VENDOR", "google")  # 默认使用 Google
 
 # API 密钥配置（优先读取环境变量）
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+DIFY_API_KEY = os.getenv("DIFY_API_KEY", "")
+DIFY_DATASET_ID = os.getenv("DIFY_DATASET_ID", "")
 
 # 动态模型配置
 _GOOGLE_DEFAULT_MODEL = "gemini-2.0-flash"

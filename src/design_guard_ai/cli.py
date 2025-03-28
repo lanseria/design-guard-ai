@@ -1,102 +1,12 @@
 from pathlib import Path
 from typing import Optional
-from google.genai import types
 import typer
 import traceback
-from markitdown import MarkItDown
-from .const import (
-    GEMINI_API_KEY,  # 新增Google API密钥
-    LLM_MODEL
-)
+from .converter import convert_file as perform_conversion
+from .ai_utils import generate_with_ai
+from .knowledge_service import KnowledgeService
 
-app = typer.Typer(help="Markdown转换工具")
-
-def get_ai_client():
-    """根据配置获取AI客户端"""
-    try:
-        from google import genai
-    except ImportError:
-        raise RuntimeError("请先安装Google AI库: pip install google-genai")
-    # 配置Google客户端
-    return genai.Client(api_key=GEMINI_API_KEY)
-
-def generate_with_ai(prompt: str):
-    """通用AI生成接口"""
-    client = get_ai_client()
-    response = []
-    generate_content_config = types.GenerateContentConfig(
-        response_mime_type="text/plain",
-    )
-    try:
-        # Google AI生成流式响应
-        print('gemini-2.0-flash')
-        for chunk in client.models.generate_content_stream(
-            model='gemini-2.0-flash',
-            contents=[{
-                "role": "user",
-                "parts": [{"text": prompt}]
-            }],
-            config=generate_content_config
-        ):
-            if chunk.text:
-                response.append(chunk.text)
-                yield chunk.text
-    except Exception as e:
-        print(f"AI Generation Error: {e}") #可选： 打印错误信息到控制台
-        traceback.print_exc()
-        raise  # 重新抛出异常，让上层函数处理
-
-    return "".join(response)
-
-def convert_file(input_path: str, output_path: str):
-    """文件转换核心函数"""
-    # 初始化AI客户端
-    try:
-        ai_client = get_ai_client()
-    except (ImportError, ValueError) as e:
-        raise RuntimeError(str(e))
-
-    md = MarkItDown()
-    # 执行转换
-    try:
-        result = md.convert(input_path)
-        raw_markdown = result.markdown
-    except Exception as e:
-        raise RuntimeError(f"Markdown Conversion Error: {e}")
-
-    # 使用优化后的 Prompt
-    prompt = """你是专业的 Markdown 文档格式化助手。
-你的任务是：
-1.  接收一段文本内容。
-2.  判断该文本是否已经是 Markdown 格式。
-3.  如果不是，则将其转换为结构良好的 Markdown 格式。
-4.  如果是，则进行必要的优化（例如：修复格式错误、调整标题级别、添加缺失的换行符）。
-5.  确保输出的 Markdown 文档：
-    *   具有清晰的标题结构（使用 #, ##, ### 等）。
-    *   正确使用列表（有序列表和无序列表）。
-    *   代码块使用正确的语法高亮。
-    *   段落之间有适当的空行。
-    *   链接和图片格式正确。
-    *   避免任何多余的解释性文字。
-只返回格式化后的 Markdown 内容，不要包含任何其他说明。
-
-输入文本：
-{}"""  # 使用 format 格式化字符串
-
-    try:
-        optimized_content = "".join(
-            generate_with_ai(prompt.format(raw_markdown))  # 将 raw_markdown 插入到 prompt 中
-        )
-    except Exception as e:
-        raise RuntimeError(f"AI Optimization Error: {e}")
-
-    # 写入文件
-    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-    if optimized_content:
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(optimized_content)
-    else:
-        print("Warning: AI returned empty content.  No file written.")
+app = typer.Typer(help="Design Guard AI 工具集")
 
 @app.command(name="convert")
 def convert(
@@ -117,30 +27,78 @@ def convert(
         writable=True
     )
 ):
-    """转换单个文件为Markdown"""
-    # 路径验证
-    if not input_file.exists():
-        typer.echo(f"错误：输入文件 {input_file} 不存在", err=True)
-        raise typer.Exit(code=2)
-    
-    # 生成输出路径
+    """转换单个文件为优化后的Markdown"""
     final_output = output or input_file.with_suffix('.md')
     
-    # 输出文件后缀检查
     if final_output.suffix.lower() != '.md':
-        typer.echo(f"警告：输出文件后缀应为 .md，检测到 {final_output.suffix}", err=True, color=True)
-    
+        typer.echo(f"警告：输出文件后缀应为 .md，检测到 {final_output.suffix}", 
+                  err=True, color=typer.colors.YELLOW)
+
     try:
-        convert_file(str(input_file), str(final_output))
-        typer.echo(f"成功转换: {input_file} -> {final_output}", color=True)
+        typer.echo(f"开始转换: {input_file} -> {final_output} ...", color=typer.colors.BLUE)
+        perform_conversion(str(input_file), str(final_output))
+        typer.echo(f"成功转换: {input_file} -> {final_output}", color=typer.colors.GREEN)
     except Exception as e:
-        typer.echo(f"转换失败: {str(e)}", err=True, color=True)
+        typer.echo(f"转换失败: {input_file}", err=True, color=typer.colors.RED)
+        typer.echo(f"错误详情: {str(e)}", err=True, color=typer.colors.RED)
         raise typer.Exit(code=1)
 
-@app.command(name="legacy-convert")
-def legacy_convert():
-    """兼容旧版计算命令"""
-    typer.run(convert)
+@app.command(name="ask")
+def ask_question(question: str = typer.Argument(..., help="您的问题")):
+    """从问答库中获取答案"""
+    typer.echo(f"原始问题: '{question}'")
+
+    # 1. 使用 AI 格式化问题
+    formatting_prompt = f"""请将以下用户问题格式化，使其更适合在技术知识库中进行检索。
+    移除不必要的寒暄，提炼核心技术疑问，不需要 markdown 格式。
+    用户问题：{question}
+    格式化后的问题："""
+    
+    typer.echo("正在使用 AI 格式化问题...")
+    try:
+        formatted_question_stream = generate_with_ai(formatting_prompt)
+        formatted_question = "".join(list(formatted_question_stream))
+        typer.echo(f"格式化后的问题: '{formatted_question}'")
+    except Exception as e:
+        traceback.print_exc()
+        typer.echo(f"使用 AI 格式化问题时出错: {e}", err=True, color=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    # 2. 使用格式化后的问题查询知识库
+    typer.echo("正在查询知识库...")
+    try:
+        records = KnowledgeService.search_dify(formatted_question)
+        if records:
+            knowledge = KnowledgeService.format_results(records)
+            
+            # 使用AI生成友好回答
+            answer_prompt = f"""根据以下知识库内容和用户原始问题，生成一个简洁友好的回答：
+            
+用户问题: {question}
+知识库内容:
+{knowledge}
+
+知识库内容:
+{knowledge}
+
+请用中文回答，保持专业但友好的语气，直接回答问题要点。"""
+            
+            typer.echo("\n正在生成回答...", color=typer.colors.BLUE)
+            try:
+                answer_stream = generate_with_ai(answer_prompt)
+                answer = "".join(list(answer_stream))
+                typer.echo("\n回答:", color=typer.colors.GREEN)
+                typer.echo(answer)
+            except Exception as e:
+                typer.echo(f"回答生成失败: {e}", err=True, color=typer.colors.YELLOW)
+                typer.echo("\n知识库原始内容:", color=typer.colors.BLUE)
+                typer.echo(knowledge)
+        else:
+            typer.echo("未找到相关信息", color=typer.colors.YELLOW)
+    except Exception as e:
+        traceback.print_exc()
+        typer.echo(f"知识库查询失败: {e}", err=True, color=typer.colors.RED)
+        raise typer.Exit(code=1)
 
 if __name__ == '__main__':
     app()
