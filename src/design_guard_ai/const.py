@@ -25,12 +25,15 @@ def get_dify_api_key():
 def get_dify_dataset_id():
     return os.getenv("DIFY_DATASET_ID", "")
 
-# 动态模型配置
-_GOOGLE_DEFAULT_MODEL = "gemini-2.0-flash"
-
 # 根据供应商选择默认模型
 def get_llm_model():
     return os.getenv("LLM_MODEL")
+
+def get_openrouter_api_key():
+    return os.getenv("OPENROUTER_API_KEY", "")
+
+def get_openai_model():
+    return os.getenv("OPENAI_MODEL", "")
 
 # 兼容旧代码
 AI_VENDOR = get_ai_vendor()
@@ -38,3 +41,5 @@ GEMINI_API_KEY = get_gemini_api_key()
 DIFY_API_KEY = get_dify_api_key()
 DIFY_DATASET_ID = get_dify_dataset_id()
 LLM_MODEL = get_llm_model()
+OPENROUTER_API_KEY = get_openrouter_api_key()
+OPENAI_MODEL = get_openai_model()

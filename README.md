@@ -31,7 +31,7 @@ dga batch ./documents --output-dir ./markdown_files
 使用 `ask` 命令向知识库提问。工具会先使用 AI 对您的问题进行格式化，以提高检索准确性，然后查询知识库（查询功能待实现）。
 
 ```bash
-dga ask "你的问题是什么？"
+dga ask "锅炉是什么？"
 # 例如: dga ask "如何在 Python 中使用 Typer 创建命令行选项？" 
 ```
 
