@@ -2,7 +2,7 @@
 from pprint import pprint
 import requests
 from typing import Dict, List, Optional
-from .const import DIFY_API_KEY, DIFY_DATASET_ID
+from .const import get_dify_api_key, get_dify_dataset_id, reload_env
 
 class KnowledgeService:
     """处理知识库检索的服务类"""
@@ -20,12 +20,17 @@ class KnowledgeService:
         Returns:
             检索结果列表或None
         """
-        if not DIFY_API_KEY or not DIFY_DATASET_ID:
+        # 确保使用最新环境变量
+        reload_env()
+        dify_api_key = get_dify_api_key()
+        dify_dataset_id = get_dify_dataset_id()
+        
+        if not dify_api_key or not dify_dataset_id:
             raise ValueError("Dify API key or dataset ID not configured")
-            
-        url = cls.DIFY_API_URL.format(dataset_id=DIFY_DATASET_ID)
+        pprint(dify_dataset_id)
+        url = cls.DIFY_API_URL.format(dataset_id=dify_dataset_id)
         headers = {
-            "Authorization": f"Bearer {DIFY_API_KEY}",
+            "Authorization": f"Bearer {dify_api_key}",
             "Content-Type": "application/json"
         }
         
