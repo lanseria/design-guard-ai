@@ -4,6 +4,7 @@ import typer
 import traceback
 from .converter import convert_file as perform_conversion
 from .qa_service import QAService
+from .pdf_analyzer import PDFAnalyzer
 
 app = typer.Typer(help="Design Guard AI 工具集")
 
@@ -53,6 +54,38 @@ def ask_question(question: str = typer.Argument(..., help="您的问题")):
     except Exception as e:
         traceback.print_exc()
         typer.echo(f"获取答案失败: {e}", err=True, color=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+@app.command(name="analyze-pdf")
+def analyze_pdf(
+    input_file: Path = typer.Argument(
+        ...,
+        help="输入PDF文件路径",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True
+    )
+):
+    """分析PDF文件中的设计规则问题"""
+    try:
+        typer.echo(f"开始分析: {input_file} ...", color=typer.colors.BLUE)
+        
+        # 1. 提取PDF文本
+        pdf_text = PDFAnalyzer.extract_text(str(input_file))
+        
+        # 2. 分析规则问题
+        issues = PDFAnalyzer.analyze_rules(pdf_text)
+        
+        # 3. 生成批注报告
+        report = PDFAnalyzer.generate_annotations(issues)
+        
+        typer.echo("\n分析结果:", color=typer.colors.GREEN)
+        typer.echo(report)
+        
+    except Exception as e:
+        typer.echo(f"分析失败: {input_file}", err=True, color=typer.colors.RED)
+        typer.echo(f"错误详情: {str(e)}", err=True, color=typer.colors.RED)
         raise typer.Exit(code=1)
 
 if __name__ == '__main__':
